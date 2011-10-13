@@ -1,7 +1,7 @@
 package geogebra.cas.view;
 
 import geogebra.cas.GeoGebraCAS;
-import geogebra.euclidian.EuclidianConstants;
+import geogebra.common.euclidian.EuclidianConstants;
 import geogebra.gui.view.Gridable;
 import geogebra.kernel.GeoCasCell;
 import geogebra.kernel.GeoElement;
