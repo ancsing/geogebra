@@ -3,34 +3,25 @@ package geogebra.plugin.jython;
 import geogebra.kernel.GeoElement;
 import geogebra.kernel.View;
 import geogebra.main.Application;
+import geogebra.main.GeoElementSelectionListener;
 
-import org.python.core.Py;
-import org.python.core.PySystemState;
 import org.python.util.PythonInterpreter;
 
-public class PythonBridge implements View {
+public class PythonBridge implements View, GeoElementSelectionListener {
 	private Application application;
 	private PythonInterpreter interpreter;
-	private String eventType;
-	private GeoElement eventTarget;
 	private PythonScriptInterface pyInterface;
 	
 	public PythonBridge(Application app) {
 		application = app;
 		interpreter = null;
+		init();
 	}
 	
 	private void init() {
 		if (interpreter == null) {
-			
-			//final PySystemState engineSys = new PySystemState();
-			//engineSys.path.append( Py.newString( "__pyclasspath__/Lib" ) );
-			//Py.setSystemState(engineSys);
-
 			interpreter = new PythonInterpreter();
-			interpreter.exec("import sys; sys.path.append('__pyclasspath__/geogebra/plugin/jython')");
-			interpreter.exec("import sys; sys.path.append('__pyclasspath__/Lib')");
-			interpreter.exec("import sys; print sys.path");
+			interpreter.exec("import sys; sys.path.extend(['__pyclasspath__/geogebra/plugin/jython', '__pyclasspath__/Lib'])");
 			interpreter.exec("from pyggb import interface");
 			pyInterface = (PythonScriptInterface)interpreter.get("interface").__tojava__(PythonScriptInterface.class);
 			pyInterface.init(application);
@@ -38,8 +29,12 @@ public class PythonBridge implements View {
 		}
 	}
 	
-	public void exec(String code) {
-		init();
+	public void toggleWindow() {
+		pyInterface.toggleWindow();
+	}
+	
+	public boolean isWindowVisible() {
+		return pyInterface.isWindowVisible();
 	}
 	
 	public void click(GeoElement geo) {
@@ -84,6 +79,10 @@ public class PythonBridge implements View {
 	
 	public int getViewID() {
 		return 0;
+	}
+
+	public void geoElementSelected(GeoElement geo, boolean addToSelection) {
+		pyInterface.notifySelected(geo, addToSelection);
 	}
 
 }

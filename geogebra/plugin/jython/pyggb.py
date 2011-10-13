@@ -57,6 +57,7 @@ class Interface(PythonScriptInterface):
             'Intersect': Intersect,
             'geo': self.geo,
             'pointlist': pointlist,
+            'interactive': interactive,
         }
         self.namespace.update(unary_functions)
         self.handling_event = False
@@ -77,6 +78,25 @@ class Interface(PythonScriptInterface):
                            % evt_type, target)
         finally:
             self.handling_event = False
+    def notifySelected(self, geo, add):
+        if self.selection_listener:
+            el = self.geo._get_element(geo)
+            self.selection_listener.send(el, add)
+            if self.selection_listener.done:
+                self.remove_selection_listener()
+        else:
+            # We shouldn't get here :)
+            self.remove_selection_listener()
+    def toggleWindow(self):
+        self.pywin.toggle_visibility()
+    def isWindowVisible(self):
+        return self.pywin.frame.visible
+    def set_selection_listener(self, sl):
+        _app.setSelectionListenerMode(_app.getPythonBridge())
+        self.selection_listener = sl
+    def remove_selection_listener(self):
+        _app.setSelectionListenerMode(None)
+        self.selection_listener = None
     def compileinteractive(self, source):
         try:
             return compile(source, "<pyggb>", "single")
@@ -112,6 +132,33 @@ class Interface(PythonScriptInterface):
 
 interface = Interface()
 
+class TestSelectionListener(object):
+    def __init__(self):
+        self.geos = []
+        self.done = False
+    def __nonzero__(self):
+        return not self.done
+    def send(self, geo, add):
+        self.geos.append(geo)
+        if len(self.geos) == 3:
+            self.done = True
+
+class interactive(object):
+    def __init__(self, f):
+        self.objs = []
+        self.done = False
+        self.f = f
+        self.nargs = f.func_code.co_argcount
+        interface.set_selection_listener(self)
+    def __nonzero__(self):
+        return not self.done
+    def send(self, obj, add):
+        self.objs.append(obj)
+        if len(self.objs) == self.nargs:
+            self.done = True
+            self.f(*self.objs)
+
+LABEL_MODES = ["name", "name+value", "value", "caption"]
 
 class Element(GenericMethods):
 
@@ -156,13 +203,6 @@ class Element(GenericMethods):
         self.geo.updateRepaint()
     color = property(_getcolor, _setcolor)
 
-    # propety: background_color
-    def _getbgcolor(self):
-        return self.geo.backgroundColor
-    def _setbgcolor(self, val):
-        self.geo.backgroundColor = val
-    background_color = property(_getbgcolor, _setbgcolor)
-    
     # property: caption
     def _getcaption(self):
         return self.geo.caption
@@ -171,6 +211,32 @@ class Element(GenericMethods):
         self.geo.updateRepaint()
     caption = property(_getcaption, _setcaption)
 
+    # property: label_mode
+    def _getlabel_mode(self):
+        return LABEL_MODES[self.geo.getLabelMode()]
+    def _setlabel_mode(self, mode):
+        try:
+            mode = LABEL_MODES.index(mode)
+            self.geo.setLabelMode()
+        except ValueError:
+            raise ValueError("illegal label mode: %s", mode)
+    label_mode = property(_getlabel_mode, _setlabel_mode)
+
+    # property: label_color
+    def _getlabel_color(self):
+        return self.geo.getLabelColor()
+    def _setlabel_color(self, color):
+        self.geo.setLabelColor(color)
+        self.geo.updateRepaint()
+    label_color = property(_getlabel_color, _setlabel_color)
+    
+    # propety: background_color
+    def _getbgcolor(self):
+        return self.geo.backgroundColor
+    def _setbgcolor(self, val):
+        self.geo.backgroundColor = val
+    background_color = property(_getbgcolor, _setbgcolor)
+    
     # property: visible
     def _getvisible(self):
         return self.geo.euclidianVisible
@@ -839,7 +905,9 @@ class PythonWindow(KeyListener):
         self.frame.add(scrollpane, BorderLayout.CENTER)
         self.frame.add(inputPanel, BorderLayout.PAGE_END)
         self.frame.size = 500, 600
-        self.frame.visible = True
+        self.frame.visible = False
+    def toggle_visibility(self):
+        self.frame.visible = not self.frame.visible
     def add(self, text, type="input"):
         self.historyList.model.addElement({"text": text, "type": type})
         self.historyList.validate()
